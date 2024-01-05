@@ -20,7 +20,7 @@ Usage of harvester:
         eg: redis://<user>:<password>@<host>:<port>/<db_number>. separated by commas.
 ```
 
-## function
+## Functions
 1. dump keys with idle time
 2. dump `Strings` as key urlencode(val)
 3. dump `Hashes` as key field urlencode(val)
