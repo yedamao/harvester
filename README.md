@@ -21,7 +21,7 @@ Usage of harvester:
 ```
 
 ## function
-1. dump keys with idle timej
+1. dump keys with idle time
 2. dump `Strings` as key urlencode(val)
 3. dump `Hashes` as key field urlencode(val)
 4. dump `Sorted sets` as key score urlencode(member)
