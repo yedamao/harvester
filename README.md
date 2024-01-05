@@ -1,5 +1,5 @@
 # harvester
-redis scan tool
+redis scan tool. dump data to file
 
 ## Install
 ```
@@ -19,3 +19,10 @@ Usage of harvester:
   -redisUrl string
         eg: redis://<user>:<password>@<host>:<port>/<db_number>. separated by commas.
 ```
+
+## function
+1. dump keys with idle timej
+2. dump `Strings` as key urlencode(val)
+3. dump `Hashes` as key field urlencode(val)
+4. dump `Sorted sets` as key score urlencode(member)
+5. Other types TODO
