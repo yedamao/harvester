@@ -1,6 +1,9 @@
 # harvester
 redis scan tool. dump data to file
 
+## Concurrency pattern
+![image](https://github.com/yedamao/harvester/assets/8220938/e43dfe2f-6487-430c-bb28-ea4463e065c2)
+
 ## Install
 ```
 go install github.com/yedamao/harvester/cmd/harvester@latest
