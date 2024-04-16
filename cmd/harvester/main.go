@@ -15,10 +15,8 @@ import (
 )
 
 var (
-	cfg                  string
-	cluster              string
-	master               bool
-	clusterShardingCount int
+	cfg    string
+	master bool
 
 	redisURL string
 
