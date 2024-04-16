@@ -15,9 +15,6 @@ import (
 )
 
 var (
-	cfg    string
-	master bool
-
 	redisURL string
 
 	matchPattern string
