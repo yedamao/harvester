@@ -3,6 +3,7 @@ package harvester
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/go-redis/redis/v8"
 	"github.com/sirupsen/logrus"
@@ -16,13 +17,12 @@ type JustDoItFunc func(key string, client *redis.Client) error
 type Harvester struct {
 	dbs []*redis.Client
 
-	prefix   string
 	justDoIt JustDoItFunc
 
 	// pipeline pass key between scan loop and worker routine
 	pipeline chan *obj4Pipe
 
-	parallel int
+	cfg *Config
 
 	done              chan struct{}
 	wg                sync.WaitGroup
@@ -50,10 +50,9 @@ func New(cfg *Config, fn JustDoItFunc) (*Harvester, error) {
 
 	h := &Harvester{
 		dbs:      dbs,
-		prefix:   cfg.Prefix,
-		parallel: cfg.Parallel,
 		justDoIt: fn,
 		pipeline: make(chan *obj4Pipe),
+		cfg:      cfg,
 		done:     make(chan struct{}),
 	}
 
@@ -64,7 +63,7 @@ func New(cfg *Config, fn JustDoItFunc) (*Harvester, error) {
 func (h *Harvester) Run() {
 
 	// spawn worker routine
-	for i := 0; i < h.parallel; i++ {
+	for i := 0; i < h.cfg.Parallel; i++ {
 		h.wg.Add(1)
 		go h.worker()
 	}
@@ -100,9 +99,10 @@ func (h *Harvester) scanLoop(db *redis.Client) {
 		default:
 		}
 
-		keys, cur, err := db.Scan(ctx, cursor, h.prefix, 100).Result()
+		keys, cur, err := h.scanWithRetry(ctx, db, cursor, h.cfg.Prefix, 100)
 		if err != nil {
-			panic(err)
+			logrus.Errorf("failed to scan after retries for instance %s/%d: %v", opt.Addr, opt.DB, err)
+			return
 		}
 
 		for _, key := range keys {
@@ -117,6 +117,43 @@ func (h *Harvester) scanLoop(db *redis.Client) {
 		}
 		cursor = cur
 	}
+}
+
+func (h *Harvester) scanWithRetry(ctx context.Context, db *redis.Client, cursor uint64, match string, count int64) ([]string, uint64, error) {
+	maxRetries := h.cfg.ScanMaxRetry
+	baseDelay := h.cfg.ScanRetryBaseDelyDuration
+
+	for attempt := 0; attempt < h.cfg.ScanMaxRetry; attempt++ {
+		select {
+		case <-h.done:
+			return nil, 0, context.Canceled
+		default:
+		}
+
+		keys, cur, err := db.Scan(ctx, cursor, match, count).Result()
+		if err == nil {
+			return keys, cur, nil
+		}
+
+		if maxRetries == 0 || baseDelay == 0 { // no retry
+			return nil, 0, err
+		}
+
+		if attempt == maxRetries-1 {
+			return nil, 0, err
+		}
+
+		delay := time.Duration(1<<uint(attempt)) * baseDelay
+		logrus.Warnf("redis scan failed (attempt %d/%d), retrying in %v: %v", attempt+1, maxRetries, delay, err)
+
+		select {
+		case <-time.After(delay):
+		case <-h.done:
+			return nil, 0, context.Canceled
+		}
+	}
+
+	return nil, 0, nil
 }
 
 type obj4Pipe struct {
